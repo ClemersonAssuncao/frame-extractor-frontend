@@ -18,7 +18,9 @@ Frontend React para consumir a API do Frame Extractor.
 
 ## Configuracao
 
-Opcionalmente crie `.env.local`:
+Em desenvolvimento, o Vite usa proxy para encaminhar `/auth` e `/videos` para `http://localhost:8080`. Assim o navegador chama o proprio front em `http://localhost:5173` e evita CORS local.
+
+Opcionalmente crie `.env.local` se quiser chamar a API diretamente ou apontar para outro host:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
