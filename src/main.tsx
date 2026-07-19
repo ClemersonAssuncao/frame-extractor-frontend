@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import JSZip from 'jszip';
 import './styles.css';
@@ -40,8 +40,11 @@ function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [frames, setFrames] = useState<FramePreview[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedJob = useMemo(
     () => jobs.find((job) => job.id === selectedJobId) ?? null,
@@ -54,7 +57,7 @@ function App() {
     }
     void loadJobs();
     const interval = window.setInterval(() => {
-      void loadJobs(false);
+      void loadJobs();
     }, 5000);
     return () => window.clearInterval(interval);
   }, [token]);
@@ -85,7 +88,7 @@ function App() {
 
   async function authenticate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
+    setAuthBusy(true);
     setMessage('');
     try {
       const auth = await request<AuthResponse>(`/auth/${authMode}`, {
@@ -101,21 +104,16 @@ function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha na autenticacao.');
     } finally {
-      setBusy(false);
+      setAuthBusy(false);
     }
   }
 
-  async function loadJobs(showLoading = true) {
-    if (showLoading) {
-      setBusy(true);
-    }
+  async function loadJobs() {
     try {
       const data = await request<VideoJob[]>('/videos');
       setJobs(data);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao carregar videos.');
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -126,7 +124,7 @@ function App() {
       return;
     }
 
-    setBusy(true);
+    setUploadBusy(true);
     setMessage('');
     try {
       for (const file of files) {
@@ -138,12 +136,15 @@ function App() {
         });
       }
       setFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       setMessage('Upload enviado. Os videos entraram na fila de exportacao.');
-      await loadJobs(false);
+      await loadJobs();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao enviar videos.');
     } finally {
-      setBusy(false);
+      setUploadBusy(false);
     }
   }
 
@@ -158,7 +159,7 @@ function App() {
   }
 
   async function saveZip(job: VideoJob) {
-    setBusy(true);
+    setActionBusy(true);
     setMessage('');
     try {
       const blob = await downloadZip(job);
@@ -166,12 +167,12 @@ function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao baixar ZIP.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   }
 
   async function previewFrames(job: VideoJob) {
-    setBusy(true);
+    setActionBusy(true);
     setSelectedJobId(job.id);
     setMessage('');
     frames.forEach((frame) => URL.revokeObjectURL(frame.url));
@@ -201,7 +202,7 @@ function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao visualizar frames.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   }
 
@@ -233,7 +234,7 @@ function App() {
               Senha
               <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={8} required />
             </label>
-            <button disabled={busy}>{authMode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+            <button disabled={authBusy}>{authMode === 'login' ? 'Entrar' : 'Criar conta'}</button>
           </form>
 
           <button className="link-button" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
@@ -265,15 +266,16 @@ function App() {
             <label>
               Videos
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.wmv,.flv"
                 multiple
                 onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
               />
             </label>
-            <button disabled={busy || files.length === 0}>Enviar {files.length || ''}</button>
+            <button disabled={uploadBusy || files.length === 0}>Enviar {files.length || ''}</button>
           </form>
-          <button className="secondary full" onClick={() => void loadJobs()} disabled={busy}>Atualizar lista</button>
+          <button className="secondary full" onClick={() => void loadJobs()} disabled={uploadBusy}>Atualizar lista</button>
           {message && <p className="message">{message}</p>}
         </aside>
 
@@ -298,8 +300,8 @@ function App() {
                 <span className={`status ${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
                 <div className="actions">
                   <button className="secondary" onClick={() => setSelectedJobId(job.id)}>Detalhes</button>
-                  <button className="secondary" disabled={job.status !== 'COMPLETED'} onClick={() => void previewFrames(job)}>Ver frames</button>
-                  <button disabled={job.status !== 'COMPLETED'} onClick={() => void saveZip(job)}>Baixar ZIP</button>
+                  <button className="secondary" disabled={actionBusy || job.status !== 'COMPLETED'} onClick={() => void previewFrames(job)}>Ver frames</button>
+                  <button disabled={actionBusy || job.status !== 'COMPLETED'} onClick={() => void saveZip(job)}>Baixar ZIP</button>
                 </div>
               </article>
             ))}
