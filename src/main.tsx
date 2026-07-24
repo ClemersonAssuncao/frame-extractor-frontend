@@ -15,6 +15,7 @@ type VideoJob = {
   id: string;
   userId: string;
   originalFilename: string;
+  frameIntervalSeconds: number;
   status: VideoStatus;
   errorMessage: string | null;
   createdAt: string;
@@ -38,6 +39,7 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [frameIntervalSeconds, setFrameIntervalSeconds] = useState('1');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [frames, setFrames] = useState<FramePreview[]>([]);
   const [authBusy, setAuthBusy] = useState(false);
@@ -123,6 +125,11 @@ function App() {
       setMessage('Selecione pelo menos um video.');
       return;
     }
+    const parsedFrameInterval = Number(frameIntervalSeconds);
+    if (!Number.isInteger(parsedFrameInterval) || parsedFrameInterval < 1 || parsedFrameInterval > 60) {
+      setMessage('O intervalo entre frames deve ser um numero inteiro entre 1 e 60 segundos.');
+      return;
+    }
 
     setUploadBusy(true);
     setMessage('');
@@ -130,6 +137,7 @@ function App() {
       for (const file of files) {
         const form = new FormData();
         form.append('file', file);
+        form.append('frameIntervalSeconds', String(parsedFrameInterval));
         await request<VideoJob>('/videos', {
           method: 'POST',
           body: form
@@ -273,6 +281,21 @@ function App() {
                 onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
               />
             </label>
+            <label>
+              Intervalo entre frames (segundos)
+              <input
+                type="number"
+                min={1}
+                max={60}
+                step={1}
+                required
+                value={frameIntervalSeconds}
+                onChange={(event) => setFrameIntervalSeconds(event.target.value)}
+              />
+              <span className="field-hint">
+                Escolha de 1 a 60 segundos. O padrao da API e 1 segundo.
+              </span>
+            </label>
             <button disabled={uploadBusy || files.length === 0}>Enviar {files.length || ''}</button>
           </form>
           <button className="secondary full" onClick={() => void loadJobs()} disabled={uploadBusy}>Atualizar lista</button>
@@ -294,6 +317,7 @@ function App() {
               <article key={job.id} className={`job-card ${selectedJobId === job.id ? 'selected' : ''}`}>
                 <div>
                   <h3>{job.originalFilename}</h3>
+                  <p>Intervalo: {job.frameIntervalSeconds} segundo{job.frameIntervalSeconds === 1 ? '' : 's'}</p>
                   <p>Atualizado em {formatDate(job.updatedAt)}</p>
                   {job.errorMessage && <p className="error">{job.errorMessage}</p>}
                 </div>

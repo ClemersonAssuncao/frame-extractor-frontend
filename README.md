@@ -6,6 +6,7 @@ Frontend React para consumir a API do Frame Extractor.
 
 - login e cadastro;
 - upload de varios videos;
+- configuracao do intervalo entre frames, de 1 a 60 segundos;
 - acompanhamento dos jobs em exportacao;
 - download do ZIP completo;
 - leitura do ZIP no navegador para visualizar frames exportados;
@@ -38,6 +39,16 @@ Acesse:
 ```text
 http://localhost:5173
 ```
+
+## Intervalo Entre Frames
+
+No formulario de upload, o usuario pode escolher o intervalo aplicado a todos
+os videos selecionados. O frontend envia `frameIntervalSeconds` no
+`multipart/form-data`, junto com o campo `file`.
+
+O valor deve ser um numero inteiro entre `1` e `60`. O formulario inicia com
+`1` segundo, que tambem e o valor padrao utilizado pela API quando o parametro
+nao e enviado.
 
 ## Observacao
 
